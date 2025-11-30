@@ -234,25 +234,6 @@ void DEPTH() {
   // Calculate depth in meters
   float time_of_flight = depthDetectSample * 13.0e-6f;
   float depth_m = (time_of_flight * 1450.0f) / 2.0f;
-
-  float depth_ft = depth_m * 3.28084f;
-  float depth_fa = depth_m / 1.8288f;
-
-  // Convert floats to strings
-  char str_ft[10], str_m[10], str_fa[10];
-  dtostrf(depth_ft, 4, 1, str_ft);
-  dtostrf(depth_m, 4, 1, str_m);
-  dtostrf(depth_fa, 4, 1, str_fa);
-
-  // Trim leading spaces (manually)
-  char* ptr_ft = str_ft;
-  char* ptr_m = str_m;
-  char* ptr_fa = str_fa;
-  while (*ptr_ft == ' ') ptr_ft++;
-  while (*ptr_m == ' ') ptr_m++;
-  while (*ptr_fa == ' ') ptr_fa++;
-
-
   int Distance1 = (depth_m*100);
   /*< Type from MAV_DISTANCE_SENSOR enum.*/
 
