@@ -59,7 +59,7 @@ volatile bool detectedDepth = false;  // Condition flag
 volatile int depthDetectSample = 0;
 
 unsigned long previousMillis = 0;
-const long interval = 1000;
+const long interval = 5000;
 
 ISR(TIMER1_COMPA_vect) {
   pulseCount++;
