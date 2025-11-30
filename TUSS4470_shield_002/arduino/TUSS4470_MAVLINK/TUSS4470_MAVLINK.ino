@@ -221,7 +221,7 @@ void HEARTBEAT() {
   uint8_t system_state = MAV_STATE_STANDBY;  ///< System ready for flight
   uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
   int type = MAV_TYPE_ONBOARD_CONTROLLER;
-  mavlink_msg_heartbeat_pack(1, 197, &msg, type, autopilot_type, system_mode, custom_mode, system_state);
+  mavlink_msg_heartbeat_pack(1, 196, &msg, type, autopilot_type, system_mode, custom_mode, system_state);
   len = mavlink_msg_to_send_buffer(buf, &msg);
   Serial.write(buf, len);
 }
@@ -258,7 +258,7 @@ void DEPTH() {
 
 
   int sysid = 1;
-  int compid = 197;
+  int compid = 196;
   uint32_t time_boot_ms = 0;   /*< Time since system boot*/
   uint16_t min_distance = 0; /*< Minimum distance the sensor can measure in centimeters*/
   uint16_t max_distance = 20000; /*< Maximum distance the sensor can measure in centimeters*/
