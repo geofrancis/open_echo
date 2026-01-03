@@ -4,6 +4,14 @@
 #include "hardware/clocks.h"
 #include "mavlink/common/mavlink.h"
 #include "mavlink/ardupilotmega/mavlink_msg_data96.h"
+#include "mavlink/common/mavlink_msg_rc_channels.h"
+#include "mavlink/common/mavlink_msg_mission_current.h"
+#include "mavlink/common/mavlink_msg_command_long.h"
+
+
+
+
+
 // -------------------- PIN DEFINITIONS --------------------
 const int SPI_CS = 17;    // Chip select for TUSS4470
 const int IO1 = 3;        // Enable pin or control (set HIGH)
@@ -24,6 +32,15 @@ volatile int sampleIndex = 0;
 float temperature = 0.0f;
 int vDrv = 0;
 
+
+
+#define SYSTEM_ID 1
+#define COMPONENT_ID 191
+#define PARAM_COUNT 2  // Total parameters defined
+
+// Global parameters with default values
+float param1 = 1.23f;
+float param2 = 4.56f;
 
 
 #define Scaled_Column 96
@@ -165,10 +182,8 @@ void command_heartbeat() {
   Serial.write(buf, len);
 }
 
-
-
 void send_data96() {
-  const uint8_t type = 42;  // sonar angle
+  const uint8_t type = 42;  // arbitrary type identifier
   uint8_t data[96];         // payload buffer
 
   // fill the payload – here we just use a counter pattern
@@ -279,6 +294,363 @@ void downsampleToColumn(uint16_t *samples, uint16_t *column) {
 
 
 
+void FetchMavlinkSerial() {
+  //Serial.println("*");
+  mavlink_message_t msg;
+  mavlink_status_t status;
+
+  //telnet.print("fc modein ");
+  //telnet.println(fcmodein);
+  // Serial.print("-");
+  while (Serial2.available()) {
+    uint8_t c = Serial2.read();
+    // Serial.println(c);
+    //Serial.println("serial data");
+    //Get new message
+    if (mavlink_parse_char(MAVLINK_COMM_0, c, &msg, &status)) {
+      //  Serial.println("mav packet");
+      //Handle new message from autopilot
+
+      switch (msg.msgid) {
+        case MAVLINK_MSG_ID_HEARTBEAT:  // #0: Heartbeat
+          {
+            // Serial.println(" ");
+            mavlink_heartbeat_t hb;
+            mavlink_msg_heartbeat_decode(&msg, &hb);
+
+            //Serial.print("custom Mode: ");
+            //Serial.println(hb.custom_mode);
+            //Serial.print("Type: ");
+            //Serial.println(hb.type);
+            //Serial.print("Autopilot: ");
+            // Serial.println(hb.autopilot);
+            //Serial.print("Base Mode: ");
+            // Serial.println(hb.base_mode);
+
+
+            //  Serial.println("fcmodein ");
+            // Serial.println(fcmodein);
+            //Serial.print("System Status: ");
+            //Serial.println(hb.system_status);
+            //     Serial.print("Mavlink Version: ");
+            //     Serial.println(hb.mavlink_version);
+            //Serial.println();
+          }
+          break;
+        case MAVLINK_MSG_ID_PARAM_SET:
+          processParamSet(&msg);
+          break;
+        case MAVLINK_MSG_ID_PARAM_REQUEST_READ:
+          processParamRequestRead(&msg);
+          Serial.println(" Parameters READ REQUEST");
+          break;
+        case MAVLINK_MSG_ID_PARAM_REQUEST_LIST:
+          Serial.println(" Parameters READ REQUEST LIST");
+          processParamRequestList();
+          break;
+
+        case MAVLINK_MSG_ID_GPS_RAW_INT:
+          {
+            mavlink_gps_raw_int_t packet;
+            mavlink_msg_gps_raw_int_decode(&msg, &packet);
+
+            mavlink_gps_raw_int_t datagps;
+            mavlink_msg_gps_raw_int_decode(&msg, &datagps);
+            // Serial.println("PX HB");
+            // Serial.println("GPS Data ");
+            //Serial.print("time usec: ");
+            // Serial.println(datagps.time_usec);
+            //  Serial.print("lat: ");
+            //     Serial.println(datagps.lat);
+            // GPSLAT = (datagps.lat);
+            //Serial.print("lon: ");
+            //Serial.println(datagps.lon);
+            // GPSLON = (datagps.lon);
+            //  Serial.print("alt: ");
+            //   Serial.println(datagps.alt);
+            //Serial.print("Sattelite visible: ");
+            //  Serial.println(datagps.satellites_visible);
+            //  satelites = (datagps.satellites_visible);
+            //   Serial.println(datagps.eph);
+            // HDOP = (datagps.eph);
+            //Serial.println(datagps.epv);
+          }
+          break;
+
+        case MAVLINK_MSG_ID_SYS_STATUS:  // #1: SYS_STATUS
+          {
+            //mavlink_message_t* msg;
+            mavlink_sys_status_t sys_status;
+            mavlink_msg_sys_status_decode(&msg, &sys_status);
+            //Serial.print("PX SYS STATUS: ");
+            // Serial.print("[Bat (V): ");
+            // Serial.print(sys_status.voltage_battery);
+            // VOLTS = (sys_status.voltage_battery);
+            // Serial.print(sys_status.voltage_battery / 1000);
+            //   Serial.print("], [Bat (A): ");
+            //   Serial.print(sys_status.current_battery);
+            // AMPS = (sys_status.current_battery);
+            //  Serial.print("], [Comms loss (%): ");
+            //  Serial.print(sys_status.drop_rate_comm);
+            //comdroprate = (sys_status.drop_rate_comm);
+            //      Serial.println("]");
+          }
+
+
+          break;
+
+        case MAVLINK_MSG_ID_ATTITUDE:  // #30
+          {
+
+            mavlink_attitude_t attitude;
+            mavlink_msg_attitude_decode(&msg, &attitude);
+            // Serial.println("PX ATTITUDE");
+            // Serial.println(attitude.roll);
+  //          roll = (attitude.roll);
+    //        pitch = (attitude.pitch);
+    //        yaw = (attitude.yaw);
+            //if (attitude.roll > 1) leds_modo = 0;
+            //else if (attitude.roll < -1) leds_modo = 2;
+            //else leds_modo = 1;
+          }
+
+          break;
+
+        case MAVLINK_MSG_ID_RC_CHANNELS_RAW:  // #35
+          {
+            mavlink_rc_channels_raw_t chs;
+            mavlink_msg_rc_channels_raw_decode(&msg, &chs);
+            //  Serial.print("Chanel 1 raw ");
+            //   Serial.println(chs.chan1_raw);
+          }
+
+          break;
+          /*
+        case MAVLINK_MSG_ID_RC_CHANNELS_SCALED:  // #35
+          {
+            mavlink_rc_channels_scaled_t RCCHANNEL;
+            mavlink_msg_rc_channels_scaled_decode(&msg, &RCCHANNEL);
+            //  Serial.print("Chanel 6 (3-Kanal Schalter): ");
+            // int RAW_SERVO = RCCHANNEL.chan6_scaled;
+            // Serial.println(RAW_SERVO);
+            // Serial.print("Chanel 5 (Schub): ");
+            //  Serial.println(RCCHANNEL.chan5_scaled);
+            //  Serial.print("Drei Kanal: ");
+            //  Serial.println(mavlink_msg_rc_channels_scaled_get_chan6_scaled(&msg));
+            //  Serial.print("Schub: ");
+            //  Serial.println(mavlink_msg_rc_channels_scaled_get_chan5_scaled(&msg));
+          }
+
+          break;
+
+        case MAVLINK_MSG_ID_GLOBAL_POSITION_INT:  // #30
+          {
+            mavlink_global_position_int_t Position;
+            //mavlink_msg_attitude_decode(&msg, &attitude);
+            mavlink_msg_global_position_int_decode(&msg, &Position);
+          }
+          break;
+*/
+
+
+
+        case MAVLINK_MSG_ID_RC_CHANNELS:  // #35
+          {
+            mavlink_rc_channels_t chs;
+            mavlink_msg_rc_channels_decode(&msg, &chs);
+            //       Serial.print("Chanel 8: ");
+            //  RCIN = (chs.chan8_raw);
+            //Functions();
+            //  Serial.println("Channel 1");
+            //  Serial.println(chs.chan1_raw);
+          }
+          break;
+          /* case MAVLINK_MSG_ID_SERVO_OUTPUT_RAW:  // #35
+          {
+            mavlink_servo_output_raw_t SERVOCHANNEL;
+            mavlink_msg_servo_output_raw_decode(&msg, &SERVOCHANNEL);
+            //  Serial.println(SERVOCHANNEL.servo1_raw);
+            //  Serial.println(SERVOCHANNEL.servo2_raw);
+            //  Serial.println(SERVOCHANNEL.servo3_raw);
+            //  Serial.print("Chanel 1 (raw): ");
+          }
+          break;
+*/
+        case MAVLINK_MSG_ID_MISSION_CURRENT:
+          {
+            mavlink_mission_current_t RPNUM;
+            mavlink_msg_mission_current_decode(&msg, &RPNUM);
+            //  Serial.print("wp_number ");
+            //  Serial.println(wp_number);
+        //    wp_number = (RPNUM.seq);
+          }
+          break;
+
+        case MAVLINK_MSG_ID_VFR_HUD:
+          {
+            mavlink_vfr_hud_t vfrhud;
+            mavlink_msg_vfr_hud_decode(&msg, &vfrhud);
+            //   Serial.print("Ground Speed: ");
+            //   Serial.println(vfrhud.groundspeed);
+            ////  Serial.print("Heading ");
+            //   Serial.println(vfrhud.heading);
+          //  gps_Vel = vfrhud.groundspeed;
+            // gps_Head = vfrhud.heading;
+          }
+
+          break;
+        case MAVLINK_MSG_ID_NAV_CONTROLLER_OUTPUT:
+          {
+            mavlink_nav_controller_output_t navout;
+            mavlink_msg_nav_controller_output_decode(&msg, &navout);
+            //  navbearing = navout.target_bearing;
+            //   wpdist = navout.wp_dist;
+            //  xtrackerror = navout.xtrack_error;
+            //    Serial.print("navbearing: ");
+            //    Serial.println(navout.nav_bearing);
+            // Serial.print("wpdist ");
+            //  Serial.println(navout.wp_dist);
+            // Serial.print("xtrackerror ");
+            // Serial.println(navout.xtrack_error);
+          }
+
+          break;
+
+        case MAVLINK_MSG_ID_NAMED_VALUE_FLOAT:
+          mavlink_named_value_float_t valueFloat;
+          mavlink_msg_named_value_float_decode(&msg, &valueFloat);
+          // Serial.print(" float: ");
+          // Serial.println(valueFloat.name);
+          // Serial.print("  ");
+          // Serial.println(valueFloat.value, 0);
+          //  String stringname = (valueFloat.name);
+          //  messagedata = (valueFloat.value);
+          // Serial.print(" float: ");
+          //Serial.print(valueFloat.name);
+          // Serial.print("  ");
+          // Serial.println(valueFloat.value);
+          break;
+
+
+        case MAVLINK_MSG_ID_STATUSTEXT:  //  #253  https://mavlink.io/en/messages/common.html#STATUSTEXT
+          {
+            mavlink_statustext_t packet;
+            mavlink_msg_statustext_decode(&msg, &packet);
+            //if (packet.severity > 0) {
+            // Serial.print("MAVMSG---------------------------------------------------");
+            //Serial.print(" severity: ");
+            // Serial.print(packet.severity);
+            //    Serial.print("     text: ");
+            //  Serial.println(packet.text);
+            // mavmessage = (packet.text);
+          }
+      }
+      break;
+    }
+  }
+}
+
+
+
+
+
+void saveParameters() {
+  Serial.println ("Save Parameters");
+  //preferences.putFloat("param1", param1);
+//  preferences.putFloat("param2", param2);
+}
+
+/*
+  loadParameters()
+  Loads parameter values from storage, using default values if none are stored.
+*/
+void loadParameters() {
+  Serial.println ("Load Parameters");
+//  param1 = preferences.getFloat("param1", 1.23f);
+ // param2 = preferences.getFloat("param2", 4.56f);
+}
+
+/*
+  sendParamValue()
+  Packs and sends a PARAM_VALUE message with the given parameter ID and value.
+  
+  Parameters:
+    - param_id: The string identifier of the parameter.
+    - value: The floating point parameter value.
+    - param_index: The index of the parameter in the global list.
+*/
+void sendParamValue(const char* param_id, float value, uint8_t param_index) {
+  mavlink_message_t msg;
+    Serial.println ("Send Parameter Value");
+  mavlink_msg_param_value_pack(1, 191, &msg,
+                               param_id, value, MAV_PARAM_TYPE_REAL32,
+                               PARAM_COUNT, param_index);
+
+  uint8_t buf[MAVLINK_MAX_PACKET_LEN];
+  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
+  Serial2.write(buf, len);
+}
+
+/*
+  processParamSet()  Handles received PARAM_SET messages: updates the parameter, saves it, and replies.
+*/
+void processParamSet(const mavlink_message_t* msg) {
+  mavlink_param_set_t param_set;
+  mavlink_msg_param_set_decode(msg, &param_set);
+
+  if (strncmp(param_set.param_id, "param1", sizeof(param_set.param_id)) == 0) {
+    param1 = param_set.param_value;
+    saveParameters();
+    sendParamValue("param1", param1, 0);
+
+  } else if (strncmp(param_set.param_id, "param2", sizeof(param_set.param_id)) == 0) {
+    param2 = param_set.param_value;
+    saveParameters();
+    sendParamValue("param2", param2, 1);
+  }
+}
+
+/*
+  processParamRequestRead()
+  Handles PARAM_REQUEST_READ messages by sending the requested parameter value.
+*/
+void processParamRequestRead(const mavlink_message_t* msg) {
+  mavlink_param_request_read_t req;
+  mavlink_msg_param_request_read_decode(msg, &req);
+
+  // If a specific parameter ID is provided, return its value.
+  if (strlen(req.param_id) > 0) {
+    if (strncmp(req.param_id, "param1", sizeof(req.param_id)) == 0) {
+      sendParamValue("param1", param1, 0);
+      return;
+    } else if (strncmp(req.param_id, "param2", sizeof(req.param_id)) == 0) {
+      sendParamValue("param2", param2, 1);
+      return;
+    }
+  } else {
+    // Otherwise, use the param_index to determine which parameter to send.
+    if (req.param_index == 0) {
+      sendParamValue("param1", param1, 0);
+      return;
+    } else if (req.param_index == 1) {
+      sendParamValue("param2", param2, 1);
+      return;
+    }
+  }
+}
+
+/*
+  processParamRequestList()
+  Sends all parameters as a list.
+*/
+void processParamRequestList() {
+  sendParamValue("param1", param1, 0);
+  sendParamValue("param2", param2, 1);
+}
+
+
+
+
 
 
 
@@ -326,8 +698,10 @@ void loop() {
 }
 
 void setup1() {}
+
+
 void loop1() {
-  // Heartbeat every second
+  FetchMavlinkSerial();
   unsigned long currentMillis1 = millis();
   if (currentMillis1 - previousMillis1 >= 1000) {
     previousMillis1 = currentMillis1;
