@@ -12,7 +12,7 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
-SerialPIO Serial3(2, 3);
+SerialPIO Serial3(7, 8);
 
 
 // -------------------- PIN DEFINITIONS --------------------
