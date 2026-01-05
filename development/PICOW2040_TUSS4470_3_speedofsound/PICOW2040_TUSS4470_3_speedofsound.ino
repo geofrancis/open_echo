@@ -12,10 +12,14 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
-SerialPIO Serial3(7, 8);
+
 
 
 // -------------------- PIN DEFINITIONS --------------------
+const int EC_PIN 5
+const int ONE_WIRE_BUS 6
+SerialPIO Serial3(7, 8);
+
 const int SPI_CS = 17;    // Chip select for TUSS4470
 const int IO1 = 3;        // Enable pin or control (set HIGH)
 const int IO2 = 2;        // Burst output pin (transducer drive)
@@ -38,10 +42,6 @@ int vDrv = 0;
 #define PWM_PIN 7
 float time_of_flight;
 float depth_m;
-
-
-#define ONE_WIRE_BUS 2
-#define EC_PIN 1
 
 
 
