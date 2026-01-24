@@ -7,19 +7,15 @@
 #include "mavlink/common/mavlink_msg_rc_channels.h"
 #include "mavlink/common/mavlink_msg_mission_current.h"
 #include "mavlink/common/mavlink_msg_command_long.h"
-
+#include "mavlink/ardupilotmega/mavlink_msg_data96.h"
 
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
-
+SerialPIO Serial3(2, 3);
 
 
 // -------------------- PIN DEFINITIONS --------------------
-const int EC_PIN 5
-const int ONE_WIRE_BUS 6
-SerialPIO Serial3(7, 8);
-
 const int SPI_CS = 17;    // Chip select for TUSS4470
 const int IO1 = 3;        // Enable pin or control (set HIGH)
 const int IO2 = 2;        // Burst output pin (transducer drive)
@@ -42,6 +38,10 @@ int vDrv = 0;
 #define PWM_PIN 7
 float time_of_flight;
 float depth_m;
+
+
+#define ONE_WIRE_BUS 2
+#define EC_PIN 1
 
 
 
@@ -281,9 +281,6 @@ float ecToSalinity(float mS_cm, float tempC) {
 
 
 void Data() {
-
-
-
   sensors.requestTemperatures();
   float tempC = sensors.getTempCByIndex(0);
   int rawAnalog = analogRead(EC_PIN);
@@ -317,6 +314,7 @@ void Data() {
 
   uint16_t downsampledColumn[Scaled_Column];
   downsampleToColumn(samples, downsampledColumn);
+  send_data96();
   time_of_flight = depthDetectSample * 13.0e-6f;
   depth_m = (time_of_flight * 1450.0f) / 2.0f;
 }
@@ -423,6 +421,80 @@ void PWM_depth_output() {
 
 
 
+void send_data96() {
+  const uint8_t type = 42;  // arbitrary type identifier
+  uint8_t data[96];         // payload buffer
+
+  // fill the payload – here we just use a counter pattern
+  for (uint8_t i = 0; i < sizeof(data); ++i) {
+    data[i] = i;
+  }
+
+  mavlink_message_t msg;
+
+  // Pack the message.
+  //   sysid = 1, compid = 200, type, len (=96), and payload pointer
+  mavlink_msg_data96_pack(
+    1,    // system_id
+    200,  // component_id
+    &msg,
+    type,          // type field
+    sizeof(data),  // len field (number of valid bytes in data[])
+    data);         // pointer to payload
+
+  // Convert the message into a byte buffer ready for transmission.
+  uint8_t buf[MAVLINK_MAX_PACKET_LEN];
+  const uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
+
+  // Send over Serial2 (MAVLink UART)
+  Serial2.write(buf, len);
+}
+
+
+
+void Depth() {
+
+  mavlink_message_t msg;
+  uint32_t time_boot_ms = millis();
+  const char *name = "depth";
+  float value = (99);
+  mavlink_msg_named_value_float_pack(1, 191, &msg, time_boot_ms, name, value);
+  uint8_t buf[MAVLINK_MAX_PACKET_LEN];
+  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
+  Serial2.write(buf, len);
+  //}
+}
+
+
+
+void Temperature() {
+
+  mavlink_message_t msg;
+  uint32_t time_boot_ms = millis();
+  const char *name = "temperature";
+  float value = (99);
+  mavlink_msg_named_value_float_pack(1, 191, &msg, time_boot_ms, name, value);
+  uint8_t buf[MAVLINK_MAX_PACKET_LEN];
+  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
+  Serial2.write(buf, len);
+  //}
+}
+
+
+
+void DriveVoltage() {
+
+
+  mavlink_message_t msg;
+  uint32_t time_boot_ms = millis();
+  const char *name = "driveVoltage";
+  float value = (99);
+  mavlink_msg_named_value_float_pack(1, 191, &msg, time_boot_ms, name, value);
+  uint8_t buf[MAVLINK_MAX_PACKET_LEN];
+  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
+  Serial2.write(buf, len);
+  //}
+}
 
 
 void FetchMavlinkSerial() {
@@ -469,20 +541,6 @@ void FetchMavlinkSerial() {
           }
           break;
 
-
-        case MAVLINK_MSG_ID_PARAM_SET:
-          processParamSet(&msg);
-          break;
-
-        case MAVLINK_MSG_ID_PARAM_REQUEST_READ:
-          processParamRequestRead(&msg);
-          Serial.println(" Parameters READ REQUEST");
-          break;
-        case MAVLINK_MSG_ID_PARAM_REQUEST_LIST:
-          Serial.println(" Parameters READ REQUEST LIST");
-          processParamRequestList();
-          break;
-
         case MAVLINK_MSG_ID_GPS_RAW_INT:
           {
             mavlink_gps_raw_int_t datagps;
@@ -517,8 +575,8 @@ void FetchMavlinkSerial() {
             // Serial.println("PX ATTITUDE");
             //  roll = (attitude.roll);
             //  pitch = (attitude.pitch);
-           // Serial.println(roll);
-           // Serial.println(pitch);
+            // Serial.println(roll);
+            // Serial.println(pitch);
           }
           break;
 
@@ -547,10 +605,10 @@ void FetchMavlinkSerial() {
             mavlink_msg_vfr_hud_decode(&msg, &vfrhud);
             // gps_Vel = vfrhud.groundspeed;
             // gps_Head = vfrhud.heading;
-          //  Serial.print("Ground Speed: ");
-          //  Serial.println(gps_Vel);
-          //  Serial.print("Heading ");
-          //  Serial.println(gps_Head);
+            //  Serial.print("Ground Speed: ");
+            //  Serial.println(gps_Vel);
+            //  Serial.print("Heading ");
+            //  Serial.println(gps_Head);
           }
           break;
 
@@ -565,95 +623,13 @@ void FetchMavlinkSerial() {
             //    Serial.println(navout.nav_bearing);
             // Serial.print("wpdist ");
             //  Serial.println(navout.wp_dist);
-          //  Serial.print("xtrackerror ");
-          //  Serial.println(navout.xtrack_error);
+            //  Serial.print("xtrackerror ");
+            //  Serial.println(navout.xtrack_error);
           }
           break;
       }
     }
   }
-}
-
-
-
-
-void saveParameters() {
-  Serial.println("Save Parameters");
-  //preferences.putFloat("param1", param1);
-  //preferences.putFloat("param2", param2);
-}
-
-
-void loadParameters() {
-  Serial.println("Load Parameters");
-  // param1 = preferences.getFloat("param1", 1.23f);
-  // param2 = preferences.getFloat("param2", 4.56f);
-}
-
-
-
-void sendParamValue(const char *param_id, float value, uint8_t param_index) {
-  mavlink_message_t msg;
-  Serial.println("Send Parameter Value");
-  mavlink_msg_param_value_pack(1, 191, &msg,
-                               param_id, value, MAV_PARAM_TYPE_REAL32,
-                               PARAM_COUNT, param_index);
-
-  uint8_t buf[MAVLINK_MAX_PACKET_LEN];
-  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
-  Serial2.write(buf, len);
-}
-
-
-void processParamSet(const mavlink_message_t *msg) {
-  mavlink_param_set_t param_set;
-  mavlink_msg_param_set_decode(msg, &param_set);
-
-  if (strncmp(param_set.param_id, "param1", sizeof(param_set.param_id)) == 0) {
-    param1 = param_set.param_value;
-    saveParameters();
-    sendParamValue("param1", param1, 0);
-
-  } else if (strncmp(param_set.param_id, "param2", sizeof(param_set.param_id)) == 0) {
-    param2 = param_set.param_value;
-    saveParameters();
-    sendParamValue("param2", param2, 1);
-  }
-}
-
-/*
-  processParamRequestRead()
-  Handles PARAM_REQUEST_READ messages by sending the requested parameter value.
-*/
-void processParamRequestRead(const mavlink_message_t *msg) {
-  mavlink_param_request_read_t req;
-  mavlink_msg_param_request_read_decode(msg, &req);
-
-  // If a specific parameter ID is provided, return its value.
-  if (strlen(req.param_id) > 0) {
-    if (strncmp(req.param_id, "param1", sizeof(req.param_id)) == 0) {
-      sendParamValue("param1", param1, 0);
-      return;
-    } else if (strncmp(req.param_id, "param2", sizeof(req.param_id)) == 0) {
-      sendParamValue("param2", param2, 1);
-      return;
-    }
-  } else {
-    // Otherwise, use the param_index to determine which parameter to send.
-    if (req.param_index == 0) {
-      sendParamValue("param1", param1, 0);
-      return;
-    } else if (req.param_index == 1) {
-      sendParamValue("param2", param2, 1);
-      return;
-    }
-  }
-}
-
-
-void processParamRequestList() {
-  sendParamValue("param1", param1, 0);
-  sendParamValue("param2", param2, 1);
 }
 
 
@@ -729,5 +705,8 @@ void loop1() {
   if (currentMillis1 - previousMillis1 >= 1000) {
     previousMillis1 = currentMillis1;
     command_heartbeat();
+    Depth();
+    Temperature();
+    DriveVoltage();
   }
 }
