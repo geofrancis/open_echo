@@ -314,7 +314,7 @@ void Data() {
 
   uint16_t downsampledColumn[Scaled_Column];
   downsampleToColumn(samples, downsampledColumn);
-  send_data96();
+
   time_of_flight = depthDetectSample * 13.0e-6f;
   depth_m = (time_of_flight * 1450.0f) / 2.0f;
 }
@@ -419,36 +419,6 @@ void PWM_depth_output() {
   digitalWrite(PWM_PIN, LOW);
 }
 
-
-
-void send_data96() {
-  const uint8_t type = 42;  // arbitrary type identifier
-  uint8_t data[96];         // payload buffer
-
-  // fill the payload – here we just use a counter pattern
-  for (uint8_t i = 0; i < sizeof(data); ++i) {
-    data[i] = i;
-  }
-
-  mavlink_message_t msg;
-
-  // Pack the message.
-  //   sysid = 1, compid = 200, type, len (=96), and payload pointer
-  mavlink_msg_data96_pack(
-    1,    // system_id
-    200,  // component_id
-    &msg,
-    type,          // type field
-    sizeof(data),  // len field (number of valid bytes in data[])
-    data);         // pointer to payload
-
-  // Convert the message into a byte buffer ready for transmission.
-  uint8_t buf[MAVLINK_MAX_PACKET_LEN];
-  const uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
-
-  // Send over Serial2 (MAVLink UART)
-  Serial2.write(buf, len);
-}
 
 
 
